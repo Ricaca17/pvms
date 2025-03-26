@@ -321,7 +321,66 @@ function getDashboardStats() {
                          LIMIT 5");
     $stats['recent_activities'] = $stmt->fetchAll();
     
+    // Get demographics data for charts
+    $stats['demographics'] = getDemographicsData();
+    
     return $stats;
+}
+
+// Get demographics data for charts
+function getDemographicsData() {
+    global $pdo;
+    $data = [];
+    
+    // Visitor trends (last 7 days)
+    $stmt = $pdo->query("SELECT DATE_FORMAT(visit_date, '%a') as day, COUNT(*) as count 
+                         FROM visits 
+                         WHERE visit_date >= DATE_SUB(CURDATE(), INTERVAL 7 DAY) 
+                         GROUP BY DATE_FORMAT(visit_date, '%a'), visit_date 
+                         ORDER BY visit_date ASC");
+    $data['visitor_trends'] = $stmt->fetchAll();
+    
+    // Fill in missing days with zero counts
+    $days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    $visitor_trends_complete = [];
+    $existing_days = array_column($data['visitor_trends'], 'day');
+    
+    foreach ($days as $day) {
+        if (in_array($day, $existing_days)) {
+            foreach ($data['visitor_trends'] as $trend) {
+                if ($trend['day'] === $day) {
+                    $visitor_trends_complete[] = $trend;
+                    break;
+                }
+            }
+        } else {
+            $visitor_trends_complete[] = ['day' => $day, 'count' => 0];
+        }
+    }
+    $data['visitor_trends'] = $visitor_trends_complete;
+    
+    // Prisoner demographics by security level
+    $stmt = $pdo->query("SELECT security_level, COUNT(*) as count 
+                         FROM prisoners 
+                         GROUP BY security_level 
+                         ORDER BY FIELD(security_level, 'Low', 'Medium', 'High', 'Maximum')");
+    $data['security_levels'] = $stmt->fetchAll();
+    
+    // Visitor relationship types
+    $stmt = $pdo->query("SELECT relationship, COUNT(*) as count 
+                         FROM visitors 
+                         GROUP BY relationship 
+                         ORDER BY count DESC 
+                         LIMIT 5");
+    $data['relationships'] = $stmt->fetchAll();
+    
+    // Visit status distribution
+    $stmt = $pdo->query("SELECT status, COUNT(*) as count 
+                         FROM visits 
+                         GROUP BY status");
+    $data['visit_status'] = $stmt->fetchAll();
+    
+    return $data;
 }
 
 // Helper functions

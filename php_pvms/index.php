@@ -56,6 +56,183 @@ require_once 'includes/header.php';
         </div>
     </div>
     
+    <!-- Summary Demographics Charts -->
+    <div class="card">
+        <div class="card-header">
+            <h2 class="card-title">Summary Demographics</h2>
+            <p class="card-description">Visitor trends and prisoner statistics</p>
+        </div>
+        <div class="card-content">
+            <div class="charts-grid">
+                <!-- Visitor Trends Line Chart -->
+                <div class="chart-container">
+                    <h3 class="chart-title">Visitor Trends (Last 7 Days)</h3>
+                    <div class="line-chart">
+                        <?php 
+                        $max_count = 0;
+                        foreach ($stats['demographics']['visitor_trends'] as $trend) {
+                            if ($trend['count'] > $max_count) $max_count = $trend['count'];
+                        }
+                        $max_count = max(1, $max_count); // Avoid division by zero
+                        ?>
+                        <svg viewBox="0 0 700 250" xmlns="http://www.w3.org/2000/svg">
+                            <!-- X and Y axis -->
+                            <line x1="50" y1="220" x2="650" y2="220" stroke="#cbd5e1" stroke-width="2"/>
+                            <line x1="50" y1="30" x2="50" y2="220" stroke="#cbd5e1" stroke-width="2"/>
+                            
+                            <!-- X axis labels -->
+                            <?php 
+                            $x_interval = 600 / (count($stats['demographics']['visitor_trends']) - 1);
+                            foreach ($stats['demographics']['visitor_trends'] as $index => $trend): 
+                                $x = 50 + ($index * $x_interval);
+                            ?>
+                                <text x="<?php echo $x; ?>" y="240" text-anchor="middle" font-size="12" fill="#64748b"><?php echo $trend['day']; ?></text>
+                            <?php endforeach; ?>
+                            
+                            <!-- Y axis labels -->
+                            <?php for ($i = 0; $i <= 4; $i++): 
+                                $y = 220 - ($i * 47.5);
+                                $value = round(($i / 4) * $max_count);
+                            ?>
+                                <text x="40" y="<?php echo $y + 5; ?>" text-anchor="end" font-size="12" fill="#64748b"><?php echo $value; ?></text>
+                                <line x1="48" y1="<?php echo $y; ?>" x2="650" y2="<?php echo $y; ?>" stroke="#e2e8f0" stroke-width="1" stroke-dasharray="5,5"/>
+                            <?php endfor; ?>
+                            
+                            <!-- Data points and line -->
+                            <?php 
+                            $points = [];
+                            foreach ($stats['demographics']['visitor_trends'] as $index => $trend): 
+                                $x = 50 + ($index * $x_interval);
+                                $y = 220 - ($trend['count'] / $max_count * 190);
+                                $points[] = "$x,$y";
+                            ?>
+                                <circle cx="<?php echo $x; ?>" cy="<?php echo $y; ?>" r="4" fill="#3b82f6"/>
+                            <?php endforeach; ?>
+                            
+                            <polyline points="<?php echo implode(' ', $points); ?>" fill="none" stroke="#3b82f6" stroke-width="2"/>
+                        </svg>
+                    </div>
+                </div>
+                
+                <!-- Security Level Bar Chart -->
+                <div class="chart-container">
+                    <h3 class="chart-title">Prisoner Security Levels</h3>
+                    <div class="bar-chart">
+                        <?php 
+                        $max_count = 0;
+                        foreach ($stats['demographics']['security_levels'] as $level) {
+                            if ($level['count'] > $max_count) $max_count = $level['count'];
+                        }
+                        $max_count = max(1, $max_count); // Avoid division by zero
+                        
+                        foreach ($stats['demographics']['security_levels'] as $level): 
+                            $height = ($level['count'] / $max_count) * 200;
+                            $color = '';
+                            switch (strtolower($level['security_level'])) {
+                                case 'low': $color = '#10b981'; break; // green
+                                case 'medium': $color = '#f59e0b'; break; // yellow
+                                case 'high': $color = '#f97316'; break; // orange
+                                case 'maximum': $color = '#ef4444'; break; // red
+                                default: $color = '#3b82f6'; break; // blue
+                            }
+                        ?>
+                            <div class="bar-chart-container">
+                                <div class="bar" style="height: <?php echo $height; ?>px; background-color: <?php echo $color; ?>;"></div>
+                                <div class="bar-label"><?php echo $level['security_level']; ?></div>
+                            </div>
+                        <?php endforeach; ?>
+                    </div>
+                </div>
+                
+                <!-- Visitor Relationship Pie Chart -->
+                <div class="chart-container">
+                    <h3 class="chart-title">Visitor Relationships</h3>
+                    <div class="pie-chart">
+                        <?php 
+                        $total = 0;
+                        foreach ($stats['demographics']['relationships'] as $rel) {
+                            $total += $rel['count'];
+                        }
+                        $total = max(1, $total); // Avoid division by zero
+                        
+                        // Colors for pie segments
+                        $colors = ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ef4444'];
+                        ?>
+                        
+                        <div class="pie-chart-container">
+                            <svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+                                <circle cx="100" cy="100" r="90" fill="#f1f5f9"/>
+                                <?php 
+                                $start_angle = 0;
+                                foreach ($stats['demographics']['relationships'] as $index => $rel): 
+                                    $percentage = ($rel['count'] / $total);
+                                    $angle = $percentage * 360;
+                                    $end_angle = $start_angle + $angle;
+                                    
+                                    // Calculate SVG arc path
+                                    $start_x = 100 + 90 * cos(deg2rad($start_angle));
+                                    $start_y = 100 + 90 * sin(deg2rad($start_angle));
+                                    $end_x = 100 + 90 * cos(deg2rad($end_angle));
+                                    $end_y = 100 + 90 * sin(deg2rad($end_angle));
+                                    
+                                    $large_arc = $angle > 180 ? 1 : 0;
+                                    
+                                    $color = $colors[$index % count($colors)];
+                                ?>
+                                <path d="M 100 100 L <?php echo $start_x; ?> <?php echo $start_y; ?> A 90 90 0 <?php echo $large_arc; ?> 1 <?php echo $end_x; ?> <?php echo $end_y; ?> Z" fill="<?php echo $color; ?>"/>
+                                <?php 
+                                    $start_angle = $end_angle;
+                                endforeach; 
+                                ?>
+                            </svg>
+                        </div>
+                        
+                        <div class="pie-legend">
+                            <?php foreach ($stats['demographics']['relationships'] as $index => $rel): 
+                                $color = $colors[$index % count($colors)];
+                            ?>
+                                <div class="legend-item">
+                                    <div class="legend-color" style="background-color: <?php echo $color; ?>"></div>
+                                    <div class="legend-label"><?php echo $rel['relationship']; ?> (<?php echo $rel['count']; ?>)</div>
+                                </div>
+                            <?php endforeach; ?>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Visit Status Bar Chart -->
+                <div class="chart-container">
+                    <h3 class="chart-title">Visit Status Distribution</h3>
+                    <div class="bar-chart">
+                        <?php 
+                        $max_count = 0;
+                        foreach ($stats['demographics']['visit_status'] as $status) {
+                            if ($status['count'] > $max_count) $max_count = $status['count'];
+                        }
+                        $max_count = max(1, $max_count); // Avoid division by zero
+                        
+                        foreach ($stats['demographics']['visit_status'] as $status): 
+                            $height = ($status['count'] / $max_count) * 200;
+                            $color = '';
+                            switch ($status['status']) {
+                                case 'Scheduled': $color = '#3b82f6'; break; // blue
+                                case 'In Progress': $color = '#f59e0b'; break; // yellow
+                                case 'Completed': $color = '#10b981'; break; // green
+                                case 'Cancelled': $color = '#ef4444'; break; // red
+                                default: $color = '#64748b'; break; // gray
+                            }
+                        ?>
+                            <div class="bar-chart-container">
+                                <div class="bar" style="height: <?php echo $height; ?>px; background-color: <?php echo $color; ?>;"></div>
+                                <div class="bar-label"><?php echo $status['status']; ?></div>
+                            </div>
+                        <?php endforeach; ?>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
     <!-- Recent Activity Section -->
     <div class="card">
         <div class="card-header">
